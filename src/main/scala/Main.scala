@@ -125,7 +125,7 @@ object Freemint extends App {
 
   val lpReservesX = lpBox.valueNum
   val lpReservesY = lpBox.tokens(2)._2
-  val lpRate = lpReservesX.toDouble / lpReservesY.toDouble
+  val lpRate = lpReservesX / lpReservesY
 
   val validRateFreeMint = lpRate * 100 > oracleRate * 98
 
