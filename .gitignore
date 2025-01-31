@@ -1,0 +1,26 @@
+# Scala and SBT
+target/
+*.class
+*.log
+*.tmp
+*.bak
+*.swp
+.project
+.cache
+.DS_Store
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+
+# OS generated files
+Thumbs.db
+*.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Environment Files
+.env
