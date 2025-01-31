@@ -137,14 +137,14 @@ object Freemint extends App {
     bankBoxOut.valueNum -
       bankBoxIn.valueNum
 
-  val bankRate = math.floor(oracleRate * (bankFeeNum + feeDenom) / feeDenom).toLong
+  val bankRate = oracleRate * (bankFeeNum + feeDenom) / feeDenom
   val validBankDelta = ergsAdded >= dexyMinted * bankRate && ergsAdded > 0
 
   val buybackErgsAdded =
     buybackOut.valueNum -
       buybackBoxIn.valueNum
 
-  val buybackRate = math.floor(oracleRate * buybackFeeNum / feeDenom).toLong
+  val buybackRate = oracleRate * buybackFeeNum / feeDenom
   val validBuybackDelta = buybackErgsAdded >= dexyMinted * buybackRate && buybackErgsAdded > 0
   val validDelta = validBankDelta && validBuybackDelta
 
