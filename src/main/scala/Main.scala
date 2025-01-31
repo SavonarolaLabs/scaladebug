@@ -4,40 +4,33 @@ import io.circe._
 import io.circe.generic.auto._
 import io.circe.parser._
 import org.ergoplatform.appkit.ErgoValue
-
 import scala.io.Source
 import BoxHelpers._
-import ergfi.Utils.loadJsonFromFile // so we can use .R4, .R5, .tokens(...) on Box
+import ergfi.Utils.loadJsonFromFile
 
-/** A single token (an asset).  `amount` is a string in JSON but we’ll convert to Long. */
 case class Asset(tokenId: String, amount: Long)
 
-/** A Box can appear in `inputs`, `dataInputs`, or `outputs`. */
 case class Box(
-                value:             String,
-                ergoTree:          String,
-                assets:            List[Asset],
+                value: String,
+                ergoTree: String,
+                assets: List[Asset],
                 additionalRegisters: Map[String, String],
-                creationHeight:    Option[Int]  // only present in outputs usually
+                creationHeight: Option[Int]
               )
 
 case class Tx(
-               inputs:      List[Box],
-               dataInputs:  List[Box],
-               outputs:     List[Box]
+               inputs: List[Box],
+               dataInputs: List[Box],
+               outputs: List[Box]
              )
 
-
 object BoxHelpers {
-
   def parseRegister(hex: String): Any = {
-    // Convert from Base16 to an ErgoValue, then .getValue is the raw Java object.
     val ev = ErgoValue.fromHex(hex)
-    ev.getValue // could be Int, Long, Some(...), etc.
+    ev.getValue
   }
 
   implicit class RichBox(val box: Box) extends AnyVal {
-
     def valueNum: Long =
       box.value.toLongOption.getOrElse(0L)
 
@@ -70,69 +63,61 @@ object BoxHelpers {
       (asset.tokenId, asset.amount.toLong)
     }
 
-    /** If you want a function like your JS `box.tokens()` returning a structure, do something like: */
     def tokens(): List[(String, Long)] =
       box.assets.map(a => (a.tokenId, a.amount.toLong))
   }
 }
 
 object Freemint extends App {
-
-  // --------------------------------------------------------------------
-  // 1) Load your JSON file from resources (adjust if needed).
-  // --------------------------------------------------------------------
-
+  def sigmaProp(a: Boolean) = a
+  def PK(addr: String) = false
 
   val rawJson = loadJsonFromFile("freemintTx.json")
-
-
-  // 2) Parse it into a Tx case class
   val tx: Tx = {
     val parsed = rawJson.as[Tx]
     parsed.getOrElse(sys.error("Could not decode freemintTx.json into Tx."))
   }
 
-  // 3) Now replicate your logic from JS code:
-  val HEIGHT     = tx.outputs.headOption.map(_.creationHeight.getOrElse(0)).getOrElse(0)
-  val context    = tx.dataInputs
-  val inputs     = tx.inputs
-  val outputs    = tx.outputs
-  val SELF       = inputs(0)
+  val HEIGHT = tx.outputs.headOption.map(_.creationHeight.getOrElse(0)).getOrElse(0)
+  val context = tx.dataInputs
+  val inputs = tx.inputs
+  val outputs = tx.outputs
+  val SELF = inputs(0)
 
-  var bankInIndex     = 1
-  var buybackInIndex  = 2
-  var selfOutIndex    = 0
-  var bankOutIndex    = 1
+  var bankInIndex = 1
+  var buybackInIndex = 2
+  var selfOutIndex = 0
+  var bankOutIndex = 1
   var buybackOutIndex = 2
-  var oracleBoxIndex  = 0
-  var lpBoxIndex      = 1
+  var oracleBoxIndex = 0
+  var lpBoxIndex = 1
 
-  var bankNFT    = "a033c16089312f77d7724ae6fd22ff5f2524a7d684fdd2f6f3f94132bbb30784"
+  var bankNFT = "a033c16089312f77d7724ae6fd22ff5f2524a7d684fdd2f6f3f94132bbb30784"
   var buybackNFT = "109dfaf60489985fc43fbbf3a49cc2f41eedc33f7b01370122c69cf4aeb58272"
-  var oracleNFT  = "e38048c74cb92bb2f908c2465106f7ab2f2632fbbbb72a26c372276263b2b011"
-  var lpNFT      = "323bf7f5cfcc33f3e4f1bd559113e46592139835b64bfe02aa810658980cb50c"
+  var oracleNFT = "e38048c74cb92bb2f908c2465106f7ab2f2632fbbbb72a26c372276263b2b011"
+  var lpNFT = "323bf7f5cfcc33f3e4f1bd559113e46592139835b64bfe02aa810658980cb50c"
 
-  val T_free   = 360
+  val T_free = 360
   val T_buffer = 5
 
-  val bankFeeNum    = 3
+  val bankFeeNum = 3
   val buybackFeeNum = 2
-  val feeDenom      = 1000
+  val feeDenom = 1000
 
   val oracleBox = context(oracleBoxIndex)
-  val lpBox     = context(lpBoxIndex)
+  val lpBox = context(lpBoxIndex)
 
-  val bankBoxIn    = inputs(bankInIndex)
+  val bankBoxIn = inputs(bankInIndex)
   val buybackBoxIn = inputs(buybackInIndex)
 
-  val successor   = outputs(selfOutIndex)
-  val bankBoxOut  = outputs(bankOutIndex)
-  val buybackOut  = outputs(buybackOutIndex)
+  val successor = outputs(selfOutIndex)
+  val bankBoxOut = outputs(bankOutIndex)
+  val buybackOut = outputs(buybackOutIndex)
 
-  val selfInR4     = SELF.R4.toInt
-  val selfInR5     = SELF.R5
-  val successorR4  = successor.R4.toInt
-  val successorR5  = successor.R5
+  val selfInR4 = SELF.R4.toInt
+  val selfInR5 = SELF.R5
+  val successorR4 = successor.R4.toInt
+  val successorR5 = successor.R5
 
   val isCounterReset = HEIGHT > selfInR4
 
@@ -140,7 +125,7 @@ object Freemint extends App {
 
   val lpReservesX = lpBox.valueNum
   val lpReservesY = lpBox.tokens(2)._2
-  val lpRate      = lpReservesX.toDouble / lpReservesY.toDouble
+  val lpRate = lpReservesX.toDouble / lpReservesY.toDouble
 
   val validRateFreeMint = lpRate * 100 > oracleRate * 98
 
@@ -164,8 +149,8 @@ object Freemint extends App {
   val validDelta = validBankDelta && validBuybackDelta
 
   val maxAllowedIfReset = lpReservesY / 100
-  val availableToMint   = if (isCounterReset) maxAllowedIfReset else selfInR5
-  val validAmount       = dexyMinted <= availableToMint
+  val availableToMint = if (isCounterReset) maxAllowedIfReset else selfInR5
+  val validAmount = dexyMinted <= availableToMint
 
   val validSuccessorR4 =
     if (!isCounterReset) {
@@ -195,10 +180,6 @@ object Freemint extends App {
       (successor.valueNum >= SELF.valueNum) &&
       validSuccessorR5 &&
       validSuccessorR4
-
-  // Fake versions of your “sigmaProp” and “PK” from the JS:
-  def sigmaProp(a: Boolean) = a
-  def PK(addr: String)      = false
 
   val contract =
     sigmaProp(
