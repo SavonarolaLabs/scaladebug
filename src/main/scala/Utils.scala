@@ -27,9 +27,16 @@ object Utils {
   def PK(a: String): Boolean = false
 
   def min(a: Int, b: Int): Int = Math.min(a, b)
-
   def max(a: Int, b: Int): Int = Math.max(a, b)
 
+  /**
+   * Takes a register's hex string, returns the underlying object:
+   *   - SInt => java.lang.Integer
+   *   - SLong => java.lang.Long
+   *   - SOption[SInt] => Some(Integer) or None
+   *   - SOption[SLong] => Some(Long) or None
+   *   etc.
+   */
   def parseRegister(reg: String): Any = {
     ErgoValue.fromHex(reg).getValue
   }
@@ -44,11 +51,14 @@ object Utils {
   def extractTokens(json: Json): Int => Option[Map[String, Any]] = { j =>
     val assets = json.hcursor.downField("assets").as[List[Json]].getOrElse(Nil).zipWithIndex.map {
       case (asset, idx) =>
-        idx.toString -> extractToken(asset).map { case (tokenId, amount) =>
-          Map("_1" -> tokenId, "_2" -> amount)
+        idx.toString -> extractToken(asset).map {
+          case (tokenId, amount) =>
+            Map("_1" -> tokenId, "_2" -> amount)
         }.getOrElse(Map.empty)
     }.toMap
-    if (j == -1) Some(assets.mapValues(_.asInstanceOf[Any])) else assets.get(j.toString)
+
+    if (j == -1) Some(assets.view.mapValues(_.asInstanceOf[Any]).toMap)
+    else assets.get(j.toString).map(_.asInstanceOf[Map[String, Any]])
   }
 
   def createInputs(tx: Json): Int => Option[Map[String, Any]] = {
@@ -68,7 +78,8 @@ object Utils {
                       "_2" -> asset.hcursor.downField("amount").as[String].map(_.toLong).getOrElse(0L)
                     )
                 }.toMap
-                if (j == -1) Some(assets.view.mapValues(_.asInstanceOf[Any]).toMap) else assets.get(j.toString)
+                if (j == -1) Some(assets.view.mapValues(_.asInstanceOf[Any]).toMap)
+                else assets.get(j.toString)
               })
             ) ++ input.hcursor.downField("additionalRegisters").as[Map[String, String]].getOrElse(Map.empty).view
               .mapValues(parseRegister).toMap
@@ -76,7 +87,6 @@ object Utils {
         case _ => None
       }
   }
-
 
   def createOutputs(tx: Json): Int => Option[Map[String, Any]] = {
     (i: Int) =>
@@ -95,7 +105,8 @@ object Utils {
                       "_2" -> asset.hcursor.downField("amount").as[String].map(_.toLong).getOrElse(0L)
                     )
                 }.toMap
-                if (j == -1) Some(assets.view.mapValues(_.asInstanceOf[Any]).toMap) else assets.get(j.toString)
+                if (j == -1) Some(assets.view.mapValues(_.asInstanceOf[Any]).toMap)
+                else assets.get(j.toString)
               })
             ) ++ output.hcursor.downField("additionalRegisters").as[Map[String, String]].getOrElse(Map.empty).view
               .mapValues(parseRegister).toMap
@@ -114,7 +125,7 @@ object Utils {
               Map(
                 "value" -> dataInput.hcursor.downField("value").as[String].map(_.toLong).getOrElse(0L),
                 "propositionBytes" -> dataInput.hcursor.downField("ergoTree").as[String].getOrElse(""),
-                "tokens" -> ((j: Int) => {
+                "tokens" -> ((j: Option[Int]) => {
                   val assets = dataInput.hcursor.downField("assets").as[List[Json]].getOrElse(Nil).zipWithIndex.map {
                     case (asset, idx) =>
                       idx.toString -> Map(
@@ -122,7 +133,7 @@ object Utils {
                         "_2" -> asset.hcursor.downField("amount").as[String].map(_.toLong).getOrElse(0L)
                       )
                   }.toMap
-                  if (j == -1) Some(assets.view.mapValues(_.asInstanceOf[Any]).toMap) else assets.get(j.toString)
+                  j.map(_.toString).flatMap(assets.get).getOrElse(assets)
                 })
               ) ++ dataInput.hcursor.downField("additionalRegisters").as[Map[String, String]].getOrElse(Map.empty).view
                 .mapValues(parseRegister).toMap
@@ -132,5 +143,4 @@ object Utils {
         )
     )
   }
-
 }
